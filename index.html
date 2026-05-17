@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notatnik Systemowy</title>
+    <title>Notatnik Systemowy z Foto</title>
     <!-- Import czcionki Roboto -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,6 +149,7 @@
             z-index: 1000;
             padding: 20px;
             flex-direction: column;
+            overflow-y: auto;
         }
 
         .modal-header {
@@ -158,6 +159,7 @@
             margin-bottom: 15px;
             border-bottom: 2px solid #000000;
             padding-bottom: 10px;
+            flex-shrink: 0;
         }
 
         .modal-title {
@@ -179,7 +181,7 @@
 
         textarea {
             width: 100%;
-            flex-grow: 1;
+            height: 200px;
             border: 2px solid #000000;
             padding: 15px;
             font-size: 16px;
@@ -189,6 +191,58 @@
             margin-bottom: 15px;
             background-color: #ffffff;
             color: #000000;
+        }
+
+        /* Obsługa zdjęć w edytorze */
+        .photo-section {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .file-input-label {
+            display: block;
+            text-align: center;
+            background-color: #ffffff;
+            color: #000000;
+            border: 2px dashed #000000;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .file-input-label:active {
+            background-color: #f0f0f0;
+        }
+
+        #imagePreviewContainer {
+            width: 100%;
+            text-align: center;
+            position: relative;
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 150px;
+            border: 2px solid #000000;
+            display: none;
+        }
+
+        .btn-delete-photo {
+            display: none;
+            background-color: #ff0000;
+            color: #ffffff;
+            border: 2px solid #000000;
+            padding: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 5px;
+            width: 100%;
+            cursor: pointer;
         }
 
         .btn-save {
@@ -202,6 +256,8 @@
             text-transform: uppercase;
             cursor: pointer;
             letter-spacing: 0.5px;
+            margin-top: auto;
+            flex-shrink: 0;
         }
 
         .btn-save:active {
@@ -252,12 +308,27 @@
             <span id="modalTitle" class="modal-title">Tytuł</span>
             <button class="btn-close" onclick="closeModal()">&times;</button>
         </div>
+        
         <textarea id="modalText" placeholder="Wpisz swoje notatki tutaj..."></textarea>
+        
+        <!-- Sekcja zdjęć telefonu -->
+        <div class="photo-section">
+            <label class="file-input-label">
+                📷 Dodaj zdjęcie z telefonu
+                <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="handlePhotoUpload(this)">
+            </label>
+            <div id="imagePreviewContainer">
+                <img id="previewImg" class="preview-img" src="" alt="Podgląd">
+                <button id="deletePhotoBtn" class="btn-delete-photo" onclick="deleteCurrentPhoto()">Usuń to zdjęcie</button>
+            </div>
+        </div>
+
         <button class="btn-save" onclick="saveData()">Zapisz w telefonie</button>
     </div>
 
     <script>
         let currentKey = '';
+        let currentPhotoBase64 = ''; // Przechowuje tymczasowe zdjęcie w pamięci RAM
 
         // Baza wszystkich tytułów sekcji
         const allSections = {
@@ -274,12 +345,13 @@
             'iso10': 'ISO 14001 - 10. Doskonalenie'
         };
 
-        // Domyślne pytania dla punktów ISO, jeśli nic jeszcze nie zapisano
+        // Domyślne szablony tekstowe
         const defaultTemplates = {
+            'komunalne': '1. Czy w zakładzie jest osobna umowa z firmą zewnętrzną na odpady komunalne, czy jest to odbiór gminny?\nOdp: \n',
             'iso4': '1. Jakie działania w zakładzie mają największy wpływ na środowisko?\nOdp: \n\n2. Czy znamy i sprawdzamy wszystkie przepisy prawne, które nas dotyczą?\nOdp: ',
             'iso5': '1. Czy mamy spisaną i podpisaną Politykę Środowiskową?\nOdp: \n\n2. Czy pracownicy wiedzą, że ochrona środowiska to ich obowiązek?\nOdp: ',
             'iso6': '1. Jakie cele środowiskowe stawiamy sobie na ten rok?\nOdp: \n\n2. Co robimy, aby zapobiec awariom i wyciekom?\nOdp: ',
-            'iso7': '1. Czy nowi pracownicy są szkoleni z zasad segregacji odpadów?\nOdp: \n\n2. Czy urządzenia (np. wentylacja, maszyny) są regularnie serwisowane?\nOdp: ',
+            'iso7': '1. Czy nowi pracownicy są szkoleni z zasad segregacji odpadów?\nOdp: \n\n2. Czy urządzenia (np. wentylacja, maszyny) are regularnie serwisowane?\nOdp: ',
             'iso8': '1. Czy cała chemia w zakładzie pochodzi z Polski, czy jest coś zza granicy? (Jeżeli tak, to czy są do niej polskie karty charakterystyki?)\nOdp: \n\n2. Czy chemia i odpady niebezpieczne stoją na wannach wychwytowych?\nOdp: \n\n3. Czy pracownicy wiedzą, gdzie są sorbenty na wypadek wycieku?\nOdp: ',
             'iso9': '1. Czy regularnie sprawdzamy i spisujemy liczniki mediów (prąd, woda, gaz)?\nOdp: \n\n2. Czy sprawdzamy, czy firmy odbierające odpady mają aktualny wpis w BDO?\nOdp: ',
             'iso10': '1. Co robimy, gdy dojdzie do pomyłki w segregacji lub wycieku, aby to się nie powtórzyło?\nOdp: '
@@ -305,41 +377,112 @@
             currentKey = key;
             document.getElementById('modalTitle').innerText = allSections[key];
             
-            // Pobranie z LocalStorage, a jeśli puste - załadowanie szablonu pytań (tylko dla ISO)
+            // Wczytanie tekstu
             let savedText = localStorage.getItem(key);
             if (savedText === null && defaultTemplates[key]) {
                 savedText = defaultTemplates[key];
             } else if (savedText === null) {
                 savedText = '';
             }
-            
             document.getElementById('modalText').value = savedText;
+            
+            // Wczytanie zdjęcia dla tego konkretnego kafelka
+            const savedPhoto = localStorage.getItem(key + '_photo');
+            const previewImg = document.getElementById('previewImg');
+            const deleteBtn = document.getElementById('deletePhotoBtn');
+            
+            if (savedPhoto) {
+                currentPhotoBase64 = savedPhoto;
+                previewImg.src = savedPhoto;
+                previewImg.style.display = 'inline-block';
+                deleteBtn.style.display = 'block';
+            } else {
+                currentPhotoBase64 = '';
+                previewImg.src = '';
+                previewImg.style.display = 'none';
+                deleteBtn.style.display = 'none';
+            }
+            
             document.getElementById('editorModal').style.display = 'flex';
         }
 
         function closeModal() {
             document.getElementById('editorModal').style.display = 'none';
+            document.getElementById('photoInput').value = ''; // Reset inputu pliku
+        }
+
+        // Przetwarzanie zdjęcia z aparatu/galerii do formatu tekstowego Base64
+        function handlePhotoUpload(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Kompresja zdjęcia, aby nie przepełnić pamięci telefonu LocalStorage (max ok 5MB)
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Maksymalna szerokość zdjęcia w bazie to 600px (wystarczy do raportu PDF)
+                        const maxW = 600;
+                        const scale = maxW / img.width;
+                        canvas.width = maxW;
+                        canvas.height = img.height * scale;
+                        
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        
+                        // Konwersja na JPEG z jakością 70%
+                        currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                        
+                        // Wyświetlenie podglądu w telefonie
+                        const previewImg = document.getElementById('previewImg');
+                        previewImg.src = currentPhotoBase64;
+                        previewImg.style.display = 'inline-block';
+                        document.getElementById('deletePhotoBtn').style.display = 'block';
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function deleteCurrentPhoto() {
+            currentPhotoBase64 = '';
+            document.getElementById('previewImg').src = '';
+            document.getElementById('previewImg').style.display = 'none';
+            document.getElementById('deletePhotoBtn').style.display = 'none';
+            document.getElementById('photoInput').value = '';
         }
 
         function saveData() {
+            // Zapis tekstu
             const textContent = document.getElementById('modalText').value;
             localStorage.setItem(currentKey, textContent);
+            
+            // Zapis zdjęcia
+            if (currentPhotoBase64) {
+                localStorage.setItem(currentKey + '_photo', currentPhotoBase64);
+            } else {
+                localStorage.removeItem(currentKey + '_photo');
+            }
+            
             closeModal();
         }
 
-        // Generowanie jednego pliku PDF ze wszystkiego
+        // Generowanie raportu PDF wraz ze zdjęciami
         function generatePDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             
             doc.setFont("Helvetica", "bold");
             doc.setFontSize(20);
-            doc.text("PEŁNY RAPORT I NOTATKI", 20, 20);
+            doc.text("PEŁNY RAPORT, NOTATKI I ZDJECIA", 20, 20);
             doc.line(20, 24, 190, 24);
             
             let yPosition = 38;
+            let hasAnyContent = false;
+            let photoQueue = []; // Kolejka zdjęć do wydrukowania na końcu pliku
 
-            // Funkcja czyszcząca tekst z polskich znaków
             function cleanText(text) {
                 if(!text) return "Brak danych";
                 return text
@@ -353,44 +496,72 @@
 
             for (const [key, title] of Object.entries(allSections)) {
                 let content = localStorage.getItem(key);
-                
-                // Jeśli użytkownik jeszcze nic nie zapisał, ale istnieje szablon pytań, bierzemy szablon
+                const photoData = localStorage.getItem(key + '_photo');
+
                 if (content === null && defaultTemplates[key]) {
                     content = defaultTemplates[key];
                 }
 
-                // Ignoruj sekcje, które są zupełnie puste
-                if (!content || content.trim() === "") continue;
+                // Sprawdzamy czy sekcja zawiera tekst lub zdjęcie
+                if ((!content || content.trim() === "") && !photoData) continue;
+                hasAnyContent = true;
 
-                // Sprawdzenie, czy nie zbliżamy się do końca strony
-                if (yPosition > 260) {
+                if (yPosition > 250) {
                     doc.addPage();
                     yPosition = 20;
                 }
 
-                // Tytuł sekcji (Kafelka)
+                // Nagłówek sekcji
                 doc.setFont("Helvetica", "bold");
                 doc.setFontSize(13);
                 doc.text(cleanText(title).toUpperCase(), 20, yPosition);
                 yPosition += 7;
                 
-                // Zawartość wpisana przez użytkownika / pytania
-                doc.setFont("Helvetica", "normal");
-                doc.setFontSize(11);
-                
-                const splitText = doc.splitTextToSize(cleanText(content), 170);
-                doc.text(splitText, 20, yPosition);
-                
-                yPosition += (splitText.length * 6) + 12;
+                // Treść tekstowa
+                if (content && content.trim() !== "") {
+                    doc.setFont("Helvetica", "normal");
+                    doc.setFontSize(11);
+                    const splitText = doc.splitTextToSize(cleanText(content), 170);
+                    doc.text(splitText, 20, yPosition);
+                    yPosition += (splitText.length * 6) + 10;
+                } else {
+                    doc.setFont("Helvetica", "italic");
+                    doc.setFontSize(10);
+                    doc.text("Brak notatek tekstowych.", 20, yPosition);
+                    yPosition += 10;
+                }
+
+                // Jeśli jest zdjęcie, dodajemy je do wydruku na osobnych stronach na końcu
+                if (photoData) {
+                    photoQueue.push({ title: title, data: photoData });
+                }
             }
 
-            if(yPosition === 38) {
+            // Drukowanie zdjęć z kolejki (każde zdjęcie na nowej stronie z podpisem)
+            if (photoQueue.length > 0) {
+                photoQueue.forEach(item => {
+                    doc.addPage();
+                    doc.setFont("Helvetica", "bold");
+                    doc.setFontSize(12);
+                    doc.text("ZDJECIE DO SEKCEJI: " + cleanText(item.title).toUpperCase(), 20, 20);
+                    doc.line(20, 23, 190, 23);
+                    
+                    // Wklejanie zdjęcia w bezpiecznym rozmiarze (szerokość 150mm, automatyczna wysokość)
+                    try {
+                        doc.addImage(item.data, 'JPEG', 20, 30, 150, 110);
+                    } catch(e) {
+                        doc.text("Blad podczas generowania pliku zdjecia.", 20, 40);
+                    }
+                });
+            }
+
+            if(!hasAnyContent) {
                 doc.setFont("Helvetica", "normal");
                 doc.setFontSize(12);
-                doc.text("Brak jakichkolwiek zapisanych notatek w pamięci urządzenia.", 20, 40);
+                doc.text("Brak jakichkolwiek zapisanych notatek lub zdjec w urzadzeniu.", 20, 40);
             }
 
-            doc.save("Zestawienie_Calkowite.pdf");
+            doc.save("Zestawienie_Z_Fotografiami.pdf");
         }
     </script>
 </body>
