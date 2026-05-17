@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notatnik Systemowy</title>
+    <!-- Import czcionki Roboto -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Biblioteka do generowania PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #ffffff;
+            color: #000000;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .header-container {
+            width: 100%;
+            max-width: 450px;
+            margin-bottom: 25px;
+            border-bottom: 3px solid #000000;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-back-main {
+            background: #000000;
+            color: #ffffff;
+            border: none;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: none;
+        }
+
+        /* Kontenery na ekrany */
+        .screen {
+            width: 100%;
+            max-width: 450px;
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* Siatka Kafelków */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .tile {
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            color: #000000;
+            padding: 22px 18px;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.1s;
+        }
+
+        .tile:active {
+            background-color: #000000;
+            color: #ffffff;
+        }
+
+        .tile::after {
+            content: '→';
+            font-weight: 700;
+            margin-left: 10px;
+        }
+
+        .tile.iso-sub-tile {
+            padding: 16px 14px;
+            font-size: 15px;
+        }
+
+        /* Sekcja dolna - przycisk PDF */
+        .action-container {
+            width: 100%;
+            max-width: 450px;
+            margin-top: auto;
+            padding-top: 30px;
+        }
+
+        .btn-pdf {
+            width: 100%;
+            background-color: #000000;
+            color: #ffffff;
+            border: 2px solid #000000;
+            padding: 16px;
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            letter-spacing: 1px;
+        }
+
+        .btn-pdf:active {
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        /* Ekran Pełnoekranowego Edytora */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            z-index: 1000;
+            padding: 20px;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 10px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            max-width: 80%;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 32px;
+            font-weight: 400;
+            cursor: pointer;
+            padding: 0 5px;
+            line-height: 1;
+        }
+
+        textarea {
+            width: 100%;
+            flex-grow: 1;
+            border: 2px solid #000000;
+            padding: 15px;
+            font-size: 16px;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            margin-bottom: 15px;
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        .btn-save {
+            width: 100%;
+            background-color: #000000;
+            color: #ffffff;
+            border: 2px solid #000000;
+            padding: 16px;
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-save:active {
+            background-color: #ffffff;
+            color: #000000;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h1 id="mainTitle">Menu Główne</h1>
+        <button id="backBtn" class="btn-back-main" onclick="showMainMenu()">Powrót</button>
+    </div>
+
+    <!-- EKRAN GŁÓWNY -->
+    <div id="mainScreen" class="screen active">
+        <div class="grid-container">
+            <div class="tile" onclick="openModal('karty')">Karty charakterystyki</div>
+            <div class="tile" onclick="openModal('komunalne')">Odpady komunalne</div>
+            <div class="tile" onclick="openModal('dzialalnosc')">Odpady z działalności</div>
+            <div class="tile" onclick="openModal('pytania')">Pytania</div>
+            <div class="tile" onclick="showIsoMenu()">ISO 14001 (Punkty normy)</div>
+        </div>
+    </div>
+
+    <!-- EKRAN PODMENU ISO 14001 -->
+    <div id="isoScreen" class="screen">
+        <div class="grid-container">
+            <div class="tile iso-sub-tile" onclick="openModal('iso4')">4. Kontekst organizacji</div>
+            <div class="tile iso-sub-tile" onclick="openModal('iso5')">5. Przywództwo</div>
+            <div class="tile iso-sub-tile" onclick="openModal('iso6')">6. Planowanie</div>
+            <div class="tile iso-sub-tile" onclick="openModal('iso7')">7. Wsparcie</div>
+            <div class="tile iso-sub-tile" onclick="openModal('iso8')">8. Działania operacyjne</div>
+            <div class="tile iso-sub-tile" onclick="openModal('iso9')">9. Ocena efektów działalności</div>
+            <div class="tile iso-sub-tile" onclick="openModal('iso10')">10. Doskonalenie</div>
+        </div>
+    </div>
+
+    <!-- GENEROWANIE CAŁOŚCI -->
+    <div class="action-container">
+        <button class="btn-pdf" onclick="generatePDF()">Wygeneruj PDF z całości</button>
+    </div>
+
+    <!-- OKNO EDYCJI NOTATKI -->
+    <div id="editorModal" class="modal">
+        <div class="modal-header">
+            <span id="modalTitle" class="modal-title">Tytuł</span>
+            <button class="btn-close" onclick="closeModal()">&times;</button>
+        </div>
+        <textarea id="modalText" placeholder="Wpisz swoje notatki tutaj..."></textarea>
+        <button class="btn-save" onclick="saveData()">Zapisz w telefonie</button>
+    </div>
+
+    <script>
+        let currentKey = '';
+
+        // Baza wszystkich tytułów sekcji (Służy do wyświetlania i generowania PDF)
+        const allSections = {
+            'karty': 'Karty charakterystyki',
+            'komunalne': 'Odpady komunalne',
+            'dzialalnosc': 'Odpady z działalności',
+            'pytania': 'Pytania',
+            'iso4': 'ISO 14001 - 4. Kontekst organizacji',
+            'iso5': 'ISO 14001 - 5. Przywództwo',
+            'iso6': 'ISO 14001 - 6. Planowanie',
+            'iso7': 'ISO 14001 - 7. Wsparcie',
+            'iso8': 'ISO 14001 - 8. Działania operacyjne',
+            'iso9': 'ISO 14001 - 9. Ocena efektów działalności',
+            'iso10': 'ISO 14001 - 10. Doskonalenie'
+        };
+
+        // Nawigacja
+        function showIsoMenu() {
+            document.getElementById('mainScreen').classList.remove('active');
+            document.getElementById('isoScreen').classList.add('active');
+            document.getElementById('backBtn').style.display = 'block';
+            document.getElementById('mainTitle').innerText = 'ISO 14001';
+        }
+
+        function showMainMenu() {
+            document.getElementById('isoScreen').classList.remove('active');
+            document.getElementById('mainScreen').classList.add('active');
+            document.getElementById('backBtn').style.display = 'none';
+            document.getElementById('mainTitle').innerText = 'Menu Główne';
+        }
+
+        // Logika Edytora
+        function openModal(key) {
+            currentKey = key;
+            document.getElementById('modalTitle').innerText = allSections[key];
+            
+            // Pobranie z LocalStorage pamięci telefonu
+            const savedText = localStorage.getItem(key) || '';
+            document.getElementById('modalText').value = savedText;
+            
+            document.getElementById('editorModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('editorModal').style.display = 'none';
+        }
+
+        function saveData() {
+            const textContent = document.getElementById('modalText').value;
+            localStorage.setItem(currentKey, textContent);
+            closeModal();
+        }
+
+        // Generowanie jednego pliku PDF ze wszystkiego
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFont("Helvetica", "bold");
+            doc.setFontSize(20);
+            doc.text("PEŁNY RAPORT I NOTATKI", 20, 20);
+            doc.line(20, 24, 190, 24);
+            
+            let yPosition = 38;
+
+            // Funkcja czyszcząca tekst z polskich znaków (zabezpieczenie stabilności zapisu PDF na telefonach bez zewnętrznych fontów)
+            function cleanText(text) {
+                if(!text) return "Brak danych";
+                return text
+                    .replace(/ą/g, 'a').replace(/Ć/g, 'C').replace(/ć/g, 'c')
+                    .replace(/ę/g, 'e').replace(/Ł/g, 'L').replace(/ł/g, 'l')
+                    .replace(/ń/g, 'n').replace(/Ó/g, 'O').replace(/ó/g, 'o')
+                    .replace(/ś/g, 's').replace(/Ś/g, 'S').replace(/ź/g, 'z')
+                    .replace(/ż/g, 'z').replace(/Ż/g, 'Z').replace(/Ą/g, 'A')
+                    .replace(/Ę/g, 'E').replace(/Ń/g, 'N');
+            }
+
+            for (const [key, title] of Object.entries(allSections)) {
+                const content = localStorage.getItem(key);
+                
+                // Ignoruj sekcje, które są puste, żeby nie marnować papieru/miejsca w PDF
+                if (!content || content.trim() === "") continue;
+
+                // Sprawdzenie, czy nie zbliżamy się do końca strony
+                if (yPosition > 260) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+
+                // Tytuł sekcji (Kafelka)
+                doc.setFont("Helvetica", "bold");
+                doc.setFontSize(13);
+                doc.text(cleanText(title).toUpperCase(), 20, yPosition);
+                yPosition += 7;
+                
+                // Zawartość wpisana przez użytkownika
+                doc.setFont("Helvetica", "normal");
+                doc.setFontSize(11);
+                
+                const splitText = doc.splitTextToSize(cleanText(content), 170);
+                doc.text(splitText, 20, yPosition);
+                
+                yPosition += (splitText.length * 6) + 12; // Odstęp do następnego wpisu
+            }
+
+            // Sprawdzenie czy cokolwiek zostało dodane do PDF
+            if(yPosition === 38) {
+                doc.setFont("Helvetica", "normal");
+                doc.setFontSize(12);
+                doc.text("Brak jakichkolwiek zapisanych notatek w pamięci urządzenia.", 20, 40);
+            }
+
+            doc.save("Zestawienie_Calkowite.pdf");
+        }
+    </script>
+</body>
+</html>
